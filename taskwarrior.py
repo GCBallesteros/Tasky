@@ -2,6 +2,9 @@ import subprocess
 import json
 import datetime
 
+from taskw import TaskWarrior as TW
+from taskw.utils import DATE_FORMAT
+
 class Utility:
 
     @staticmethod
@@ -33,6 +36,9 @@ class Task:
     def id(self):
         return self.data['id']
 
+    def status(self):
+        return self.data['status']
+
     def due_date(self):
         return self.parse_date_at_key('due')
 
@@ -61,9 +67,13 @@ class Task:
 
 class TaskWarrior:
 
-    def pending_tasks(self, args=''):
-        raw_output = subprocess.check_output(['task', 'export',
-            'status:pending', args])
+    def retrieve_tasks(self, args='', status=['pending']):
+        if 'completed' in status:
+            subproc_args = ['task', 'export', args]
+        else:
+            subproc_args = ['task', 'export', 'status:pending', args]
+        
+        raw_output = subprocess.check_output([arg for arg in subproc_args if arg != ''])
 
         task_json = '[%s]' % raw_output
         return [Task(task) for task in json.loads(task_json, strict=False)[0]]

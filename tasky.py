@@ -3,17 +3,22 @@
 
 import urwid
 import sys
+import os
+import time
 
 from taskwarrior import TaskWarrior, Utility
 from taskwidget import TaskWidget
 from lineeditor import LineEditor
 from scrollinglistbox import ScrollingListBox
 
+from neovim import attach
+
 
 class Tasky(object):
 
     palette = [
         ('proj', '', '', '', 'dark green', ''),
+        ('completed', '', '', '', '', ''),
         ('proj_focus', '', '', '', 'dark gray', 'dark green'),
         ('body','', '', '', 'dark blue', ''),
         ('body_focus', '', '', '', 'dark gray', 'dark cyan'),
@@ -29,10 +34,13 @@ class Tasky(object):
 
         self.limit = ''.join(sys.argv[1:])
 
+        self.nvim = None
+
         header = urwid.AttrMap(urwid.Text('tasky.α'), 'head')
         self.walker = urwid.SimpleListWalker([])
         self.list_box = ScrollingListBox(self.walker)
         self.view = urwid.Frame(urwid.AttrWrap(self.list_box, 'body'))
+        self.required_status = ['pending']
         self.refresh()
 
         def update_header():
@@ -49,7 +57,23 @@ class Tasky(object):
 
     def refresh(self):
         limit = self.limit or ''
-        self.walker[:] = map(TaskWidget, self.warrior.pending_tasks(limit))
+        self.walker[:] = map(TaskWidget, self.warrior.retrieve_tasks(limit, status=self.required_status))
+
+
+    def attach_nvim(self):
+        Utility.run_command("tmux split-window -h 'NVIM_LISTEN_ADDRESS=/tmp/nvim nvim'")
+
+        while True:
+            try:
+                time.sleep(1)
+                nvim = attach('socket', path='/tmp/nvim')
+            except:
+                continue
+            break
+
+        self.nvim = nvim
+
+
 
     def keystroke(self, input):
         def exit():
@@ -67,7 +91,8 @@ class Tasky(object):
             'i': self.new_task,
             ':': self.command_mode,
             '!': self.shell_mode,
-            'l': self.change_limit
+            'l': self.change_limit,
+            'A': self.show_all,
         }
 
         task_action_map = {
@@ -93,7 +118,30 @@ class Tasky(object):
 
 
     def task_note(self, task):
-        Utility.run_command("tmux split-window 'tasknote %i'" % task.id())
+        if not self.nvim:
+            self.attach_nvim()
+
+        note_folder = "~/.tasknote/"
+        note_file = os.path.expanduser(note_folder + task.uuid() + ".markdown")
+
+
+
+        if not os.path.isfile(note_file):
+            with open(note_file, 'w+') as fh:
+                header = "# " + task.description()
+                fh.write(header)
+            
+            # Annotate the task to show that it has notes now.
+            Utility.run_command("task %i annotate Notes" % task.id())
+
+        # either capture error or write note before changing buffer
+        try:
+            self.nvim.command("e " + note_file)
+        except:
+            self.nvim.command("w")
+            self.nvim.command("e " + note_file)
+
+
 
     def present_editor(self, prompt, text, handler):
         self.foot = LineEditor(prompt, text)
@@ -153,6 +201,15 @@ class Tasky(object):
     def limit_done(self, content):
         self.limit = content
         self.refresh()
+
+    def show_all(self):
+        if 'completed' not in self.required_status:
+            self.required_status += ['completed']
+            self.refresh()
+        else:
+            self.required_status = ['pending']
+            self.refresh()
+
 
 
 Tasky()

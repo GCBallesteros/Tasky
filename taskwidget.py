@@ -1,3 +1,4 @@
+# -*- coding: latin-1 -*-
 import urwid
 
 class TaskWidget (urwid.WidgetWrap):
@@ -5,7 +6,13 @@ class TaskWidget (urwid.WidgetWrap):
     def __init__ (self, task):
         self.task = task
 
-        desc = urwid.Text(task.description())
+        desc = task.description()
+        if  self.task.status() == 'completed':
+            desc = '✓ ' + desc.encode('cp1250')
+        else:
+            desc = '  ' + desc
+        desc = urwid.Text(desc)
+
         proj = urwid.Text(task.project() + ' ', align='right')
 
         due  = urwid.Text(task.due_date_string() + ' ', align='right')
