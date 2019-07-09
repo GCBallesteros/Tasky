@@ -2,9 +2,6 @@ import subprocess
 import json
 import datetime
 
-from taskw import TaskWarrior as TW
-from taskw.utils import DATE_FORMAT
-
 class Utility:
 
     @staticmethod

@@ -4,6 +4,7 @@
 import urwid
 import sys
 import os
+from os.path import expanduser 
 import time
 
 from taskwarrior import TaskWarrior, Utility
@@ -18,7 +19,6 @@ class Tasky(object):
 
     palette = [
         ('proj', '', '', '', 'dark green', ''),
-        ('completed', '', '', '', '', ''),
         ('proj_focus', '', '', '', 'dark gray', 'dark green'),
         ('body','', '', '', 'dark blue', ''),
         ('body_focus', '', '', '', 'dark gray', 'dark cyan'),
@@ -33,8 +33,8 @@ class Tasky(object):
         self.warrior = TaskWarrior()
 
         self.limit = ''.join(sys.argv[1:])
-
         self.nvim = None
+        self.note_folder = "~/.tasknote/"
 
         header = urwid.AttrMap(urwid.Text('tasky.α'), 'head')
         self.walker = urwid.SimpleListWalker([])
@@ -77,6 +77,10 @@ class Tasky(object):
 
     def keystroke(self, input):
         def exit():
+
+            if self.nvim:
+                self.nvim.quit("wq")
+
             raise urwid.ExitMainLoop()
 
         def undo():
@@ -121,9 +125,10 @@ class Tasky(object):
         if not self.nvim:
             self.attach_nvim()
 
-        note_folder = "~/.tasknote/"
-        note_file = os.path.expanduser(note_folder + task.uuid() + ".markdown")
+        if not os.path.isdir(expanduser(self.note_folder)):
+            os.mkdir(expanduser(self.note_folder))
 
+        note_file = expanduser(self.note_folder + task.uuid() + ".markdown")
 
 
         if not os.path.isfile(note_file):
